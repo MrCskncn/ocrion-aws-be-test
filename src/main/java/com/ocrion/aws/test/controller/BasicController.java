@@ -13,7 +13,7 @@ public class BasicController {
 
     @GetMapping("/greet")
     public ResponseEntity<?> greet(@RequestParam(name = "name", required = false, defaultValue = "Stranger") String name){
-        return ResponseEntity.ok(String.format("Hello %s! This is 10. test.",name));
+        return ResponseEntity.ok(String.format("Hello %s! This is 12. lel.",name));
     }
 
     @PostMapping("/echo")
