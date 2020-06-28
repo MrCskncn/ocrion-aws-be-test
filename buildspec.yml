@@ -6,7 +6,8 @@ phases:
       - echo Logging in to Amazon ECR...
       - aws --version
       - jq --version
-      - $(aws ecr get-login --no-include-email --region us-east-1)
+      - REGION=us-east-1
+      - $(aws ecr get-login --no-include-email --region $REGION)
       - REPOSITORY_URI=922334818590.dkr.ecr.us-east-1.amazonaws.com/ocrion-core
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
@@ -28,10 +29,13 @@ phases:
       - zip taskdefinition.zip taskdefinition.json
       - aws s3 cp taskdefinition.zip s3://ocrion-task-definitions/taskdefinition.zip
       - NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
-      - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "dev-core" --region "us-east-1")
+      - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${ENV}-${APP}" --region $REGION)
       - NEW_TASK_DEFINTIION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$NEW_IMAGE" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities)')
-      - NEW_TASK_INFO=$(aws ecs register-task-definition --region "us-east-1" --cli-input-json "$NEW_TASK_DEFINTIION")
+      - echo Registering new task...
+      - NEW_TASK_INFO=$(aws ecs register-task-definition --region $REGION --cli-input-json "$NEW_TASK_DEFINTIION")
       - NEW_REVISION=$(echo $NEW_TASK_INFO | jq '.taskDefinition.revision')
-      - aws ecs update-service --cluster "ocrion-dev-fargate-cluster" --service "dev-core-service" --task-definition "dev-core:${NEW_REVISION}"
+      - echo Deploying version...
+      - aws ecs update-service --cluster $CLUSTER_NAME --service "${ENV}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}"
+      - echo All success!
 artifacts:
     files: taskdefinition.json
