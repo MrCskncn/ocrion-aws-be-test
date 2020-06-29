@@ -32,7 +32,7 @@ phases:
       - aws s3 cp taskdefinition.zip s3://ocrion-task-definitions/taskdefinition.zip
       - echo "${CODEBUILD_SOURCE_VERSION}"
       - |
-        if [[ ${CODEBUILD_SOURCE_VERSION} =~ pr/.* ]]; then
+        if expr "${CODEBUILD_SOURCE_VERSION}" : '^pr/.*' >/dev/null; then
           aws elbv2 create-target-group --name ocrion-${ENV}-${APP}-tg --protocol HTTP --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
         else
           NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
