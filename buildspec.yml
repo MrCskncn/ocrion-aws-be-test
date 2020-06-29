@@ -35,8 +35,7 @@ phases:
           if expr "${CODEBUILD_SOURCE_VERSION}" : '^pr/.*' >/dev/null; then
             aws elbv2 create-target-group --name "ocrion-pr-${PR_NUM}-${APP}-tg" --protocol HTTP --target-type ip --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
             NEW_TG=$(aws elbv2 describe-target-groups --name "ocrion-pr-${PR_NUM}-${APP}-tg" | jq -r '.TargetGroups[0].TargetGroupArn')
-            PR_URL=pr-$PR_NUM.dev.ottomannetwork.net
-            aws elbv2 create-rule --listener-arn "arn:aws:elasticloadbalancing:us-east-1:922334818590:listener/app/ocrion-ecs-dev-alb/d0db38658bc48ce1/0d2897e5b127eeb0" --conditions '{"Field":"host-header","HostHeaderConfig":{"Values": [${PR_URL}]}}' --actions Type=forward,TargetGroupArn=$NEW_TG --priority $RAND
+            aws elbv2 create-rule --listener-arn "arn:aws:elasticloadbalancing:us-east-1:922334818590:listener/app/ocrion-ecs-dev-alb/d0db38658bc48ce1/0d2897e5b127eeb0" --conditions '{"Field":"host-header","HostHeaderConfig":{"Values": ["pr-'$PR_NUM'.dev.ottomannetwork.net"]}}' --actions Type=forward,TargetGroupArn=$NEW_TG --priority $RAND
           else
             NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
             TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${ENV}-${APP}" --region $REGION)
