@@ -14,6 +14,21 @@ phases:
   build:
     commands:
       - echo Build started on `date`
+      - echo "${CODEBUILD_SOURCE_VERSION}"
+      - |
+          if expr "${CODEBUILD_SOURCE_VERSION}" : '^pr/.*' >/dev/null; then
+            aws elbv2 create-target-group --name ocrion-${ENV}-${APP}-tg --protocol HTTP --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
+          else
+            NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
+            TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${ENV}-${APP}" --region $REGION)
+            NEW_TASK_DEFINTIION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$NEW_IMAGE" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities)')
+            echo Registering new task...
+            NEW_TASK_INFO=$(aws ecs register-task-definition --region $REGION --cli-input-json "$NEW_TASK_DEFINTIION")
+            NEW_REVISION=$(echo $NEW_TASK_INFO | jq '.taskDefinition.revision')
+            echo Deploying version...
+            aws ecs update-service --cluster $CLUSTER_NAME --service "${ENV}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}"
+            echo All success!
+          fi
       - mvn package
       - echo Building the Docker image...          
       - docker build -t $REPOSITORY_URI:latest .
@@ -28,20 +43,5 @@ phases:
       - printf '[{"name":"ocrion-core","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > taskdefinition.json
       - zip taskdefinition.zip taskdefinition.json
       - aws s3 cp taskdefinition.zip s3://ocrion-task-definitions/taskdefinition.zip
-      - echo "${CODEBUILD_SOURCE_VERSION}"
-      - |
-          if expr "${CODEBUILD_SOURCE_VERSION}" : ^pr/.* >/dev/null; then
-            aws elbv2 create-target-group --name ocrion-${ENV}-${APP}-tg --protocol HTTP --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
-          else
-            NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
-            TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${ENV}-${APP}" --region $REGION)
-            NEW_TASK_DEFINTIION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$NEW_IMAGE" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities)')
-            echo Registering new task...
-            NEW_TASK_INFO=$(aws ecs register-task-definition --region $REGION --cli-input-json "$NEW_TASK_DEFINTIION")
-            NEW_REVISION=$(echo $NEW_TASK_INFO | jq '.taskDefinition.revision')
-            echo Deploying version...
-            aws ecs update-service --cluster $CLUSTER_NAME --service "${ENV}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}"
-            echo All success!
-          fi
 artifacts:
     files: taskdefinition.json
