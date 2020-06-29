@@ -13,7 +13,7 @@ phases:
       - IMAGE_TAG=${COMMIT_HASH:=latest}
       - echo "${CODEBUILD_SOURCE_VERSION}"
       - PR_NUM=$(echo $CODEBUILD_SOURCE_VERSION | grep -P '([^\/]+$)' -o)
-      - RAND=$(awk -v min=1000 -v max=100000 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+      - RAND=$(awk -v min=500 -v max=50000 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
   build:
     commands:
       - echo Build started on `date`
