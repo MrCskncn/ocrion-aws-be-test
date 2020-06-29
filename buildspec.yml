@@ -31,7 +31,7 @@ phases:
       - echo "${CODEBUILD_SOURCE_VERSION}"
       - |
         if expr "${CODEBUILD_SOURCE_VERSION}" : "pr/.*" >/dev/null; then
-          yarn run build-dev;
+          aws elbv2 create-target-group --name ocrion-${ENV}-${APP}-tg --protocol HTTP --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
         else
           NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
           TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${ENV}-${APP}" --region $REGION)
