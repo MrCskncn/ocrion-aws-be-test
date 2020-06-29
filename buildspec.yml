@@ -3,13 +3,17 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
+      - REGION=us-east-1
       - aws --version
       - jq --version
-      - $(aws ecr get-login --no-include-email --region us-east-1)
-      - REPOSITORY_URI=922334818590.dkr.ecr.us-east-1.amazonaws.com/ocrion-aws-be-pr
+      - echo Logging in to Amazon ECR...
+      - $(aws ecr get-login --no-include-email --region $REGION)
+      - REPOSITORY_URI=922334818590.dkr.ecr.us-east-1.amazonaws.com/ocrion-core
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
+      - PR_NUM=$(echo $CODEBUILD_SOURCE_VERSION | grep -P '([^\/]+$)' -o)
+      - RAND=$(awk -v min=500 -v max=50000 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
   build:
     commands:
       - echo Build started on `date`
@@ -24,8 +28,25 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo Writing definitions file...
-      - printf '[{"name":"ocrion-aws-be-pr","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > taskdefinition.json
+      - printf '[{"name":"ocrion-core","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > taskdefinition.json
       - zip taskdefinition.zip taskdefinition.json
       - aws s3 cp taskdefinition.zip s3://ocrion-task-definitions/taskdefinition.zip
+      - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${ENV}-${APP}" --region $REGION)
+      - NEW_TASK_DEFINTIION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$NEW_IMAGE" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities)')
+      - echo Registering new task...
+      - NEW_TASK_INFO=$(aws ecs register-task-definition --region $REGION --cli-input-json "$NEW_TASK_DEFINTIION")
+      - NEW_REVISION=$(echo $NEW_TASK_INFO | jq '.taskDefinition.revision')
+      - |
+          if expr "${CODEBUILD_SOURCE_VERSION}" : '^pr/.*' >/dev/null; then
+            aws elbv2 create-target-group --name "ocrion-pr-${PR_NUM}-${APP}-tg" --protocol HTTP --target-type ip --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
+            NEW_TG=$(aws elbv2 describe-target-groups --name "ocrion-pr-${PR_NUM}-${APP}-tg" | jq -r '.TargetGroups[0].TargetGroupArn')
+            aws elbv2 create-rule --listener-arn "arn:aws:elasticloadbalancing:us-east-1:922334818590:listener/app/ocrion-ecs-dev-alb/d0db38658bc48ce1/0d2897e5b127eeb0" --conditions '{"Field":"host-header","HostHeaderConfig":{"Values": ["pr-'$PR_NUM'.dev.ottomannetwork.net"]}}' --actions Type=forward,TargetGroupArn=$NEW_TG --priority $RAND
+            echo Deploying PR version...
+            aws ecs create-service --cluster $CLUSTER_NAME --service-name "pr-${PR_NUM}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}" --desired-count 1 --launch-type FARGATE --platform-version LATEST --network-configuration "awsvpcConfiguration={subnets=[subnet-0d8018748743c5820,subnet-02c72f9ec64f74ade,subnet-02c2042b58b0c663e],securityGroups=[sg-067abeb1cb1272a51],assignPublicIp=DISABLED}" --load-balancers "targetGroupArn=$NEW_TG,containerName=${ENV}-${APP},containerPort=8080"
+          else
+            echo Deploying develop version...
+            aws ecs update-service --cluster $CLUSTER_NAME --service "${ENV}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}"
+          fi
+      - echo All success!
 artifacts:
     files: taskdefinition.json
