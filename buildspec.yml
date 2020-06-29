@@ -32,7 +32,7 @@ phases:
       - |
         if [[ ${CODEBUILD_SOURCE_VERSION} =~ pr/.* ]]; then
           yarn run build-dev;
-        elif
+        else
           NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
           TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${ENV}-${APP}" --region $REGION)
           NEW_TASK_DEFINTIION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$NEW_IMAGE" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities)')
