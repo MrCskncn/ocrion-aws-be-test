@@ -42,7 +42,7 @@ phases:
             NEW_TG=$(aws elbv2 describe-target-groups --name "ocrion-pr-${PR_NUM}-${APP}-tg" | jq -r '.TargetGroups[0].TargetGroupArn')
             aws elbv2 create-rule --listener-arn "arn:aws:elasticloadbalancing:us-east-1:922334818590:listener/app/ocrion-ecs-dev-alb/d0db38658bc48ce1/0d2897e5b127eeb0" --conditions '{"Field":"host-header","HostHeaderConfig":{"Values": ["pr-'$PR_NUM'.dev.ottomannetwork.net"]}}' --actions Type=forward,TargetGroupArn=$NEW_TG --priority $RAND
             echo Deploying PR version...
-            aws ecs create-service --cluster $CLUSTER_NAME --service-name "pr-${PR_NUM}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}" --desired-count 1 --launch-type FARGATE --platform-version LATEST --network-configuration "awsvpcConfiguration={subnets=[subnet-0d8018748743c5820,subnet-02c72f9ec64f74ade,subnet-02c2042b58b0c663e],securityGroups=[sg-067abeb1cb1272a51],assignPublicIp=DISABLED}"
+            aws ecs create-service --cluster $CLUSTER_NAME --service-name "pr-${PR_NUM}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}" --desired-count 1 --launch-type FARGATE --platform-version LATEST --network-configuration "awsvpcConfiguration={subnets=[subnet-0d8018748743c5820,subnet-02c72f9ec64f74ade,subnet-02c2042b58b0c663e],securityGroups=[sg-067abeb1cb1272a51],assignPublicIp=DISABLED}" --load-balancers "targetGroupArn=$NEW_TG,containerName=${ENV}-${APP},containerPort=8080"
           else
             echo Deploying develop version...
             aws ecs update-service --cluster $CLUSTER_NAME --service "${ENV}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}"
