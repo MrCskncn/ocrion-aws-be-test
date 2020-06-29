@@ -30,7 +30,7 @@ phases:
       - aws s3 cp taskdefinition.zip s3://ocrion-task-definitions/taskdefinition.zip
       - echo "${CODEBUILD_SOURCE_VERSION}"
       - |
-        if [[ ${CODEBUILD_SOURCE_VERSION} =~ pr/.* ]]; then
+        if expr "${CODEBUILD_SOURCE_VERSION}" : "pr/.*" >/dev/null; then
           yarn run build-dev;
         else
           NEW_IMAGE=$REPOSITORY_URI:$IMAGE_TAG
