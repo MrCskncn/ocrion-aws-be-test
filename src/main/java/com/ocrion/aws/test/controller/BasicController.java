@@ -13,10 +13,10 @@ public class BasicController {
 
     @GetMapping("/greet")
     public ResponseEntity<?> greet(@RequestParam(name = "name", required = false, defaultValue = "Stranger") String name){
-        return ResponseEntity.ok(String.format("Hello %s! This is first attempt.",name));
+        return ResponseEntity.ok(String.format("Hello %s! This is fourth attempt.",name));
     }
 
-    @PostMapping("/echo")
+    @PostMapping("/echo")f
     public ResponseEntity<?> echo(@RequestBody(required = false) Map<String,Object> data){
         if(data == null){
             data = new HashMap<>();
