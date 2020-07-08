@@ -25,7 +25,13 @@ phases:
     commands:
       - echo Build completed
       - echo Pushing the Docker images...
-      - docker push $REPOSITORY_URI:latest
+      - |
+          if expr "${CODEBUILD_SOURCE_VERSION}" : '^master.*' >/dev/null; then
+            echo Deploying latest version since the branch is master...
+            docker push $REPOSITORY_URI:latest
+          else
+            echo Branch is not master, so latest tag wont be updated.
+          fi
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo Writing definitions file...
       - printf '[{"name":"ocrion-core","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > taskdefinition.json
