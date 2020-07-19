@@ -41,11 +41,15 @@ phases:
       - NEW_REVISION=$(echo $NEW_TASK_INFO | jq '.taskDefinition.revision')
       - |
           if expr "${CODEBUILD_SOURCE_VERSION}" : '^pr/.*' >/dev/null; then
-            aws elbv2 create-target-group --name "ocrion-pr-${PR_NUM}-${APP}-tg" --protocol HTTP --target-type ip --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
-            NEW_TG=$(aws elbv2 describe-target-groups --name "ocrion-pr-${PR_NUM}-${APP}-tg" | jq -r '.TargetGroups[0].TargetGroupArn')
-            aws elbv2 create-rule --listener-arn $LISTENER_ARN --conditions '{"Field":"host-header","HostHeaderConfig":{"Values": ["pr-'$PR_NUM'.dev.ottomannetwork.net"]}}' --actions Type=forward,TargetGroupArn=$NEW_TG --priority $RAND
-            echo Deploying PR version...
-            aws ecs create-service --cluster $CLUSTER_NAME --service-name "pr-${PR_NUM}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}" --desired-count 1 --launch-type FARGATE --platform-version LATEST --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_1,$SUBNET_2,$SUBNET_3],securityGroups=[$SG_ID],assignPublicIp=DISABLED}" --load-balancers "targetGroupArn=$NEW_TG,containerName=${ENV}-${APP},containerPort=8080"
+            if [[ "${CODEBUILD_WEBHOOK_EVENT} == "PULL_REQUEST_UPDATED" || "PULL_REQUEST_REOPENED" ]]; then
+              echo This is updated or reopened pull request.
+            else
+              aws elbv2 create-target-group --name "ocrion-pr-${PR_NUM}-${APP}-tg" --protocol HTTP --target-type ip --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
+              NEW_TG=$(aws elbv2 describe-target-groups --name "ocrion-pr-${PR_NUM}-${APP}-tg" | jq -r '.TargetGroups[0].TargetGroupArn')
+              aws elbv2 create-rule --listener-arn $LISTENER_ARN --conditions '{"Field":"host-header","HostHeaderConfig":{"Values": ["pr-'$PR_NUM'.dev.ottomannetwork.net"]}}' --actions Type=forward,TargetGroupArn=$NEW_TG --priority $RAND
+              echo Deploying PR version...
+              aws ecs create-service --cluster $CLUSTER_NAME --service-name "pr-${PR_NUM}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}" --desired-count 1 --launch-type FARGATE --platform-version LATEST --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_1,$SUBNET_2,$SUBNET_3],securityGroups=[$SG_ID],assignPublicIp=DISABLED}" --load-balancers "targetGroupArn=$NEW_TG,containerName=${ENV}-${APP},containerPort=8080"
+            fi
           else
             echo Deploying develop version...
             aws ecs update-service --cluster $CLUSTER_NAME --service "${ENV}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}"
