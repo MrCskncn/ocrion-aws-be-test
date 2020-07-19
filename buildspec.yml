@@ -51,5 +51,3 @@ phases:
             aws ecs update-service --cluster $CLUSTER_NAME --service "${ENV}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}"
           fi
       - echo All success!
-artifacts:
-    files: taskdefinition.json
