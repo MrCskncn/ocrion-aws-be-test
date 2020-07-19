@@ -41,7 +41,7 @@ phases:
       - NEW_REVISION=$(echo $NEW_TASK_INFO | jq '.taskDefinition.revision')
       - |
           if expr "${CODEBUILD_SOURCE_VERSION}" : '^pr/.*' >/dev/null; then
-            if expr "${CODEBUILD_WEBHOOK_EVENT}" : 'PULL_REQUEST_UPDATED' || 'PULL_REQUEST_REOPENED'; then
+            if expr "${CODEBUILD_WEBHOOK_EVENT}" : 'PULL_REQUEST_UPDATED' | 'PULL_REQUEST_REOPENED'; then
               echo This is updated or reopened pull request.
             else
               aws elbv2 create-target-group --name "ocrion-pr-${PR_NUM}-${APP}-tg" --protocol HTTP --target-type ip --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
