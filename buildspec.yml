@@ -6,6 +6,7 @@ phases:
       - REGION=eu-west-1
       - aws --version
       - jq --version
+      - echo $CODEBUILD_WEBHOOK_EVENT
       - echo Logging in to Amazon ECR...
       - $(aws ecr get-login --no-include-email --region $REGION)
       - REPOSITORY_URI=922334818590.dkr.ecr.eu-west-1.amazonaws.com/ocrion-core
