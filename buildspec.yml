@@ -43,8 +43,9 @@ phases:
           if expr "${CODEBUILD_SOURCE_VERSION}" : '^pr/.*' >/dev/null; then
             case "${CODEBUILD_WEBHOOK_EVENT}" in
               PULL_REQUEST_UPDATED|PULL_REQUEST_REOPENED)
-                echo This is updated or reopened pull request.
                 echo ${CODEBUILD_WEBHOOK_EVENT}
+                echo Re-deploying ${PR_NUM}-${APP} version...
+                aws ecs update-service --cluster $CLUSTER_NAME --service "pr-${PR_NUM}-${APP}-service" --task-definition "${ENV}-${APP}:${NEW_REVISION}"
                 ;;
               *)
                 aws elbv2 create-target-group --name "ocrion-pr-${PR_NUM}-${APP}-tg" --protocol HTTP --target-type ip --port 8080 --vpc-id $VPC_ID --health-check-path "/api/greet?name=PR" --health-check-interval-seconds 30 --health-check-timeout-seconds 10 --healthy-threshold-count 2 --unhealthy-threshold-count 2
